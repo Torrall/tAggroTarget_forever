@@ -4,7 +4,7 @@ local defaults = {
     offsetX = 20,        -- pixels right of cursor
     offsetY = -20,       -- pixels below cursor
     fontSize = 14,
-    prefix = "→ ",
+    prefix = "",
 }
 
 -- Midnight: secret values can be shown but not compared or used in math.
@@ -106,7 +106,7 @@ GameTooltip:HookScript("OnTooltipCleared", function()
     if not UnitExists("mouseover") then frame:Hide() end
 end)
 
-SLASH_tAGGROTARGET1 = "/agt"
+SLASH_tAGGROTARGET2 = "/agt"
 SlashCmdList.tAGGROTARGET = function(msg)
     local key, val = msg:match("^(%S+)%s+(%S+)$")
     val = tonumber(val)
