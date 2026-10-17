@@ -1,6 +1,9 @@
 local ADDON_NAME = ...
 
-local defaults = {
+local NPT = {}
+NameplateTargetAddon = NPT
+
+NPT.defaults = {
     offsetX = 0,
     offsetY = -2,
     fontSize = 12,
@@ -10,46 +13,31 @@ local defaults = {
     tankMode = false,
 }
 
-local db = defaults
-
-NameplateTargetAddon = { defaults = defaults }
+local db                -- set to the saved variables on ADDON_LOADED
 local labels, pool = {}, {}
 
-local function ApplyFont(f)
-    f.target:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
-    f.threat:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
-end
-
-local function UpdateAll()
-    for unit in pairs(labels) do
-        UpdateUnit(unit)
-    end
-end
-
-function NameplateTargetAddon.Refresh()
-    for _, f in pairs(labels) do ApplyFont(f) end
-    UpdateAll()
-end
-
+---------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------
 local function isSecret(v)
     return issecretvalue and issecretvalue(v) or false
 end
 
+-- Returns true/false, or nil if the value is secret
 local function SafeBool(v)
-    if isSecret(v) then
-        return nil
-    end
+    if isSecret(v) then return nil end
     return v and true or false
 end
 
 ---------------------------------------------------------------------
 -- Label pool: each label has a target line and a threat line
 ---------------------------------------------------------------------
+function NPT.ApplyFont(f)
+    f.target:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
+    f.threat:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
+end
 
-
-
-
-local function AcquireLabel()
+function NPT.AcquireLabel()
     local f = table.remove(pool)
     if not f then
         f = CreateFrame("Frame", nil, UIParent)
@@ -64,11 +52,11 @@ local function AcquireLabel()
         f.threat:SetPoint("TOP", f.target, "BOTTOM", 0, -1)
         f.threat:SetJustifyH("CENTER")
     end
-    ApplyFont(f)
+    NPT.ApplyFont(f)
     return f
 end
 
-local function ReleaseLabel(unit)
+function NPT.ReleaseLabel(unit)
     local f = labels[unit]
     if f then
         f:Hide()
@@ -78,35 +66,16 @@ local function ReleaseLabel(unit)
     end
 end
 
+function NPT.ReleaseAll()
+    for unit in pairs(labels) do
+        NPT.ReleaseLabel(unit)
+    end
+end
+
 ---------------------------------------------------------------------
 -- Colors
 ---------------------------------------------------------------------
-local function GetTargetColor(unit)
-    -- Only use class color when we can positively tell it's a player
-    local reaction = UnitReaction(unit, "player")
-    if SafeBool(UnitIsPlayer(unit)) == true then
-        local classToken = UnitClassBase(unit)
-        local c = C_ClassColor.GetClassColor(classToken)
-        if c then
-            return c.r, c.g, c.b
-        end
-    else
-        local reaction = UnitReaction(unit, "player")
-        if reaction and not isSecret(reaction) then
-            local c = FACTION_BAR_COLORS[reaction]
-            if c then
-                return c.r, c.g, c.b
-            end
-        end
-    end
-    return 1, 1, 1
-end
-
-
----------------------------------------------------------------------
--- Update logic
----------------------------------------------------------------------
--- Tank palette: 0 = no threat (bad), 3 = securely tanking (good)
+-- Tank palette: 0 = no lead (bad), 3 = securely tanking (good)
 local tankStateColors = {
     [0] = { 1.0, 0.2, 0.2 },   -- red
     [1] = { 1.0, 0.5, 0.1 },   -- orange
@@ -116,7 +85,27 @@ local tankStateColors = {
 
 local constantThreatColor = { 1, 1, 1 }   -- used when tank mode is off
 
-local function UpdateThreat(f, unit)
+function NPT.GetTargetColor(unit)
+    -- Class color only when we can positively tell it's a player.
+    -- The color values themselves may be secret, which is fine for SetTextColor.
+    if SafeBool(UnitIsPlayer(unit)) == true then
+        local baseClass = UnitClassBase(unit)
+        local c = C_ClassColor.GetClassColor(baseClass)
+        if c then return c.r, c.g, c.b end
+    else
+        local reaction = UnitReaction(unit, "player")
+        if reaction and not isSecret(reaction) then
+            local c = FACTION_BAR_COLORS[reaction]
+            if c then return c.r, c.g, c.b end
+        end
+    end
+    return 1, 1, 1
+end
+
+---------------------------------------------------------------------
+-- Update logic
+---------------------------------------------------------------------
+function NPT.UpdateThreat(f, unit)
     if not db.showThreat then
         f.threat:SetText("")
         return
@@ -130,39 +119,39 @@ local function UpdateThreat(f, unit)
 
     f.threat:SetFormattedText("%d%%", pct)   -- secret number, display only
 
+    local color = constantThreatColor
     if db.tankMode then
         local state = UnitThreatLeadSituation("player", unit)
-        if state == nil then
-            f.threat:SetTextColor(unpack(constantThreatColor))
-        else
-            f.threat:SetTextColor(unpack(tankStateColors[state]))
+        if state ~= nil then
+            color = tankStateColors[state]
         end
-    else
-        f.threat:SetTextColor(unpack(constantThreatColor))
     end
+    f.threat:SetTextColor(unpack(color))
 end
 
-local function UpdateUnit(unit)
+function NPT.UpdateUnit(unit)
+    if not db then return end   -- not loaded yet
+
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if not plate then
-        ReleaseLabel(unit)
+        NPT.ReleaseLabel(unit)
         return
     end
 
     if db.hostileOnly and SafeBool(UnitCanAttack("player", unit)) == false then
-        ReleaseLabel(unit)
+        NPT.ReleaseLabel(unit)
         return
     end
 
     local targetUnit = unit .. "target"
     if not UnitExists(targetUnit) then
-        ReleaseLabel(unit)
+        NPT.ReleaseLabel(unit)
         return
     end
 
     local f = labels[unit]
     if not f then
-        f = AcquireLabel()
+        f = NPT.AcquireLabel()
         labels[unit] = f
     end
 
@@ -174,18 +163,66 @@ local function UpdateUnit(unit)
         f.target:SetTextColor(1, 0.2, 0.2)
     else
         f.target:SetFormattedText("%s%s", db.prefix, UnitName(targetUnit) or "")
-        f.target:SetTextColor(GetTargetColor(targetUnit))
+        f.target:SetTextColor(NPT.GetTargetColor(targetUnit))
     end
 
-    UpdateThreat(f, unit)
+    NPT.UpdateThreat(f, unit)
     f:Show()
 end
 
+function NPT.UpdateAll()
+    for unit in pairs(labels) do
+        NPT.UpdateUnit(unit)
+    end
+end
 
+-- Called by the options panel whenever a setting changes
+function NPT.Refresh()
+    for _, f in pairs(labels) do
+        NPT.ApplyFont(f)
+    end
+    NPT.UpdateAll()
+end
+
+---------------------------------------------------------------------
+-- Saved variables
+---------------------------------------------------------------------
+function NPT.LoadSettings()
+    NameplateTargetDB = NameplateTargetDB or {}
+    db = NameplateTargetDB
+
+    for k, v in pairs(NPT.defaults) do
+        if db[k] == nil then db[k] = v end
+    end
+
+    -- migrate old 1/0 settings to booleans
+    for _, k in ipairs({ "hostileOnly", "showThreat", "tankMode" }) do
+        if type(db[k]) == "number" then db[k] = db[k] ~= 0 end
+    end
+
+    NPT.db = db
+end
 
 ---------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------
+function NPT.OnEvent(_, event, arg1)
+    if event == "ADDON_LOADED" then
+        if arg1 ~= ADDON_NAME then return end
+        NPT.LoadSettings()
+        NPT.InitOptions()
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+        NPT.UpdateUnit(arg1)
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        NPT.ReleaseLabel(arg1)
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        NPT.ReleaseAll()
+    elseif arg1 and arg1:find("^nameplate") then
+        -- UNIT_TARGET and the threat events
+        NPT.UpdateUnit(arg1)
+    end
+end
+
 local driver = CreateFrame("Frame")
 driver:RegisterEvent("ADDON_LOADED")
 driver:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -194,55 +231,28 @@ driver:RegisterEvent("UNIT_TARGET")
 driver:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
 driver:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
 driver:RegisterEvent("PLAYER_ENTERING_WORLD")
-
-driver:SetScript("OnEvent", function(_, event, arg1)
-    if event == "ADDON_LOADED" then
-        if arg1 ~= ADDON_NAME then
-            return
-        end
-        NameplateTargetDB = NameplateTargetDB or {}
-        for k, v in pairs(defaults) do
-            if NameplateTargetDB[k] == nil then
-                NameplateTargetDB[k] = v
-            end
-        end
-        -- migrate old 1/0 settings to booleans
-        for _, k in ipairs({ "hostileOnly", "showThreat", "tankMode" }) do
-            if type(db[k]) == "number" then db[k] = db[k] ~= 0 end
-        end
-
-        NameplateTargetAddon.db = db
-        NameplateTargetAddon.InitOptions()
-    elseif event == "NAME_PLATE_UNIT_ADDED" then
-        UpdateUnit(arg1)
-    elseif event == "NAME_PLATE_UNIT_REMOVED" then
-        ReleaseLabel(arg1)
-    elseif event == "PLAYER_ENTERING_WORLD" then
-        for unit in pairs(labels) do
-            ReleaseLabel(unit)
-        end
-    else
-        if arg1 and arg1:find("^nameplate") then
-            UpdateUnit(arg1)
-        end
-    end
-end)
+driver:SetScript("OnEvent", NPT.OnEvent)
 
 -- Backup polling; the threat events don't always fire per nameplate
-C_Timer.NewTicker(0.3, UpdateAll)
+C_Timer.NewTicker(0.3, NPT.UpdateAll)
 
+---------------------------------------------------------------------
+-- Slash command
+---------------------------------------------------------------------
 SLASH_NAMEPLATETARGET1 = "/npt"
 SlashCmdList.NAMEPLATETARGET = function(msg)
+    if msg == "" then
+        Settings.OpenToCategory(NPT.category:GetID())
+        return
+    end
+
     local key, val = msg:match("^(%S+)%s+(%S+)$")
     val = tonumber(val)
-    if key and val and type(defaults[key]) == "number" then
+    if key and val and type(NPT.defaults[key]) == "number" then
         db[key] = val
-        for _, f in pairs(labels) do
-            ApplyFont(f)
-        end
-        UpdateAll()
+        NPT.Refresh()
         print("NameplateTarget:", key, "=", val)
     else
-        print("NameplateTarget: /npt offsetX|offsetY|fontSize|hostileOnly|showThreat|tankMode <number>")
+        print("NameplateTarget: /npt (opens settings) or /npt offsetX|offsetY|fontSize <number>")
     end
 end
