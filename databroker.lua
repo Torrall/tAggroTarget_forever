@@ -45,9 +45,9 @@ function NPT.InitBroker()
 
         OnClick = function(_, button)
             if button == "LeftButton" then
-                NPT.OpenOptions()
-            elseif button == "RightButton" then
                 NPT.ToggleTankMode()
+            elseif button == "RightButton" then
+                NPT.OpenOptions()
             end
         end,
 
