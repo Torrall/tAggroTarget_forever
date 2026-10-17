@@ -1,4 +1,4 @@
-local NPT = NameplateTargetAddon
+local NPT = tNameplateTargetAddon
 
 function NPT.OpenOptions()
     Settings.OpenToCategory(NPT.category:GetID())

@@ -6,9 +6,10 @@
 ## Version: 1.0.0
 ## SavedVariables: tAggroTargetDB
 
-Libs\LibStub\LibStub.lua
-Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
-Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\LibStub-1.0\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 
 nameplates.lua
 options.lua
+databroker.lua
