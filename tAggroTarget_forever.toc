@@ -1,0 +1,9 @@
+## Interface: 16001
+## Category: Torrall Addons
+## Title: |cfc7D26CDt|caf800080AggroTarget (Forever)
+## Notes: Shows the current aggro holder
+## Author: Torrall
+## Version: 1.0.0
+## SavedVariables: tAggroTargetDB
+
+main.lua
