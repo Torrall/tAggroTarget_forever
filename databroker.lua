@@ -1,6 +1,14 @@
 local NPT = tNameplateTargetAddon
 
+local function Msg(text)
+    print("|cff33ccfftAggroTarget:|r " .. text)
+end
+
 function NPT.OpenOptions()
+    if InCombatLockdown() then
+        Msg("Can't open the settings in combat.")
+        return
+    end
     Settings.OpenToCategory(NPT.category:GetID())
 end
 
@@ -18,18 +26,20 @@ function NPT.UpdateBroker()
     end
 end
 
+
 function NPT.ToggleTankMode()
     NPT.db.tankMode = not NPT.db.tankMode
     NPT.Refresh()   -- redraws labels and updates the broker text
+    Msg("Tank mode " .. (NPT.db.tankMode and "|cff4dff4dON|r" or "|cffaaaaaaOFF|r"))
 end
 
 function NPT.InitBroker()
     local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
     if not LDB then return end
 
-    NPT.broker = LDB:NewDataObject("NameplateTarget", {
+    NPT.broker = LDB:NewDataObject("tAggroTarget", {
         type = "data source",
-        label = "Nameplate Target",
+        label = "tAggroTarget",
         icon = "Interface\\Icons\\Ability_Warrior_DefensiveStance",
         text = StatusText(),
 
@@ -42,7 +52,7 @@ function NPT.InitBroker()
         end,
 
         OnTooltipShow = function(tooltip)
-            tooltip:AddLine("Nameplate Target")
+            tooltip:AddLine("tAggroTarget")
             tooltip:AddLine("|cffffffffLeft-click|r to open settings")
             tooltip:AddLine("|cffffffffRight-click|r to toggle tank mode")
             tooltip:AddLine(" ")
