@@ -210,6 +210,7 @@ function NPT.Refresh()
         NPT.ApplyFont(f)
         NPT.ApplyThreatAnchor(f)
     end
+    NPT.UpdateBroker()
     NPT.UpdateAll()
 end
 
@@ -246,6 +247,7 @@ function NPT.OnEvent(_, event, arg1)
         end
         NPT.LoadSettings()
         NPT.InitOptions()
+        NPT.InitBroker()
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         NPT.UpdateUnit(arg1)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
