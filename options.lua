@@ -5,7 +5,7 @@ function NPT.InitOptions()
     local db = NPT.db
     local defaults = NPT.defaults
 
-    local category, layout = Settings.RegisterVerticalLayoutCategory("Nameplate Target")
+    local category, layout = Settings.RegisterVerticalLayoutCategory("tAggroTarget")
 
     -- Helper: bind a setting to db[key]
     local function Bind(key, varType, label)
