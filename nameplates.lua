@@ -186,13 +186,8 @@ function NPT.UpdateUnit(unit)
     f:ClearAllPoints()
     f:SetPoint("TOP", plate, "BOTTOM", db.offsetX, db.offsetY)
 
-    if SafeBool(UnitIsUnit(targetUnit, "player")) then
-        f.target:SetText(db.prefix .. "YOU")
-        f.target:SetTextColor(1, 0.2, 0.2)
-    else
-        f.target:SetFormattedText("%s%s", db.prefix, UnitName(targetUnit) or "")
-        f.target:SetTextColor(NPT.GetTargetColor(targetUnit))
-    end
+    f.target:SetFormattedText("%s%s", db.prefix, UnitName(targetUnit) or "")
+    f.target:SetTextColor(NPT.GetTargetColor(targetUnit))
 
     NPT.UpdateThreat(f, unit)
     f:Show()
