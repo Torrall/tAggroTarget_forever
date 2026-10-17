@@ -4,9 +4,8 @@ local defaults = {
     offsetX = 0,
     offsetY = -2,
     fontSize = 12,
-    prefix = "",
-    hostileOnly = 1,        -- 1 = only attackable units
-    fallbackToTarget = 0,   -- 1 = show the mob's target when no threat holder is found
+    prefix = "→ ",
+    hostileOnly = 1,   -- 1 = only show on attackable units, 0 = all
 }
 local db = defaults
 
@@ -14,58 +13,14 @@ local function isSecret(v)
     return issecretvalue and issecretvalue(v) or false
 end
 
--- Returns true/false, or nil if the value is secret
+-- Safely get a non-secret boolean, or nil if unknown
 local function SafeBool(v)
     if isSecret(v) then return nil end
     return v and true or false
 end
 
----------------------------------------------------------------------
--- Roster of units that can hold threat (player, pet, party/raid + pets)
----------------------------------------------------------------------
-local roster = {}
-
-local function BuildRoster()
-    wipe(roster)
-    roster[#roster + 1] = "player"
-    roster[#roster + 1] = "pet"
-    if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do
-            roster[#roster + 1] = "raid" .. i
-            roster[#roster + 1] = "raidpet" .. i
-        end
-    elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do
-            roster[#roster + 1] = "party" .. i
-            roster[#roster + 1] = "partypet" .. i
-        end
-    end
-end
-
--- Returns holderUnit (or nil), sawSecret (true if any check was unreadable)
-local function FindThreatHolder(mob)
-    print("checking threat for ", mob)
-    local sawSecret = false
-    for i = 1, #roster do
-        local u = roster[i]
-        if UnitExists(u) then
-            local isTanking = UnitDetailedThreatSituation(u, mob)
-            local tanking = SafeBool(isTanking)
-            if tanking then
-                print(u,"istanking",sawSecret)
-                return u, sawSecret
-            elseif tanking == nil then
-                sawSecret = true
-            end
-        end
-    end
-    return nil, sawSecret
-end
-
----------------------------------------------------------------------
--- Label pool
----------------------------------------------------------------------
-local labels, pool = {}, {}
+local labels = {}   -- [unitToken] = label frame
+local pool = {}
 
 local function AcquireLabel()
     local f = table.remove(pool)
@@ -91,15 +46,15 @@ local function ReleaseLabel(unit)
     end
 end
 
-local function GetColor(unit)
-    if UnitIsPlayer(unit) then
-        local _, classToken = UnitClass(unit)
+local function GetColor(targetUnit)
+    if UnitIsPlayer(targetUnit) then
+        local _, classToken = UnitClass(targetUnit)
         if classToken and not isSecret(classToken) then
             local c = RAID_CLASS_COLORS[classToken]
             if c then return c.r, c.g, c.b end
         end
     else
-        local reaction = UnitReaction(unit, "player")
+        local reaction = UnitReaction(targetUnit, "player")
         if reaction and not isSecret(reaction) then
             local c = FACTION_BAR_COLORS[reaction]
             if c then return c.r, c.g, c.b end
@@ -108,9 +63,6 @@ local function GetColor(unit)
     return 1, 1, 1
 end
 
----------------------------------------------------------------------
--- Update logic
----------------------------------------------------------------------
 local function UpdateUnit(unit)
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if not plate then
@@ -118,22 +70,17 @@ local function UpdateUnit(unit)
         return
     end
 
+    -- Optionally skip friendly units
     if db.hostileOnly == 1 then
-        if SafeBool(UnitCanAttack("player", unit)) == false then
+        local canAttack = SafeBool(UnitCanAttack("player", unit))
+        if canAttack == false then
             ReleaseLabel(unit)
             return
         end
     end
 
-    local holder, sawSecret = FindThreatHolder(unit)
-
-    -- Fallback: the mob's current target is usually the threat holder anyway
-    if not holder and (sawSecret or db.fallbackToTarget == 1) then
-        local t = unit .. "target"
-        if UnitExists(t) then holder = t end
-    end
-
-    if not holder then
+    local targetUnit = unit .. "target"
+    if not UnitExists(targetUnit) then
         ReleaseLabel(unit)
         return
     end
@@ -147,33 +94,31 @@ local function UpdateUnit(unit)
     f:ClearAllPoints()
     f:SetPoint("TOP", plate, "BOTTOM", db.offsetX, db.offsetY)
 
-    local isMe = SafeBool(UnitIsUnit(holder, "player"))
+    local name = UnitName(targetUnit)
+    local isMe = SafeBool(UnitIsUnit(targetUnit, "player"))
+
     if isMe then
         f.text:SetText(db.prefix .. "YOU")
         f.text:SetTextColor(1, 0.2, 0.2)
     else
-        f.text:SetFormattedText("%s%s", db.prefix, UnitName(holder) or "")
-        f.text:SetTextColor(GetColor(holder))
+        -- SetFormattedText accepts secret strings without inspecting them
+        f.text:SetFormattedText("%s%s", db.prefix, name or "")
+        f.text:SetTextColor(GetColor(targetUnit))
     end
     f:Show()
 end
 
 local function UpdateAll()
-    for unit in pairs(labels) do UpdateUnit(unit) end
+    for unit in pairs(labels) do
+        UpdateUnit(unit)
+    end
 end
 
----------------------------------------------------------------------
--- Events
----------------------------------------------------------------------
 local driver = CreateFrame("Frame")
 driver:RegisterEvent("ADDON_LOADED")
 driver:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 driver:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
-driver:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
-driver:RegisterEvent("UNIT_THREAT_SITUATION_UPDATE")
 driver:RegisterEvent("UNIT_TARGET")
-driver:RegisterEvent("GROUP_ROSTER_UPDATE")
-driver:RegisterEvent("UNIT_PET")
 driver:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 driver:SetScript("OnEvent", function(_, event, arg1)
@@ -184,34 +129,31 @@ driver:SetScript("OnEvent", function(_, event, arg1)
             if NameplateTargetDB[k] == nil then NameplateTargetDB[k] = v end
         end
         db = NameplateTargetDB
-        BuildRoster()
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         UpdateUnit(arg1)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         ReleaseLabel(arg1)
-    elseif event == "GROUP_ROSTER_UPDATE" or event == "UNIT_PET" then
-        BuildRoster()
+    elseif event == "UNIT_TARGET" then
+        if arg1 and arg1:find("^nameplate") then
+            UpdateUnit(arg1)
+        end
     elseif event == "PLAYER_ENTERING_WORLD" then
-        BuildRoster()
         for unit in pairs(labels) do ReleaseLabel(unit) end
-    else
-        -- threat / target events: arg1 is the mob unit
-        if arg1 and arg1:find("^nameplate") then UpdateUnit(arg1) end
     end
 end)
 
--- Backup polling in case events don't fire reliably for nameplate units
-C_Timer.NewTicker(0.3, UpdateAll)
+-- UNIT_TARGET can be unreliable for nameplates, so poll as a backup
+C_Timer.NewTicker(0.2, UpdateAll)
 
-SLASH_tAGGROTARGET1 = "/agt"
-SlashCmdList.tAGGROTARGET = function(msg)
+SLASH_NAMEPLATETARGET1 = "/npt"
+SlashCmdList.NAMEPLATETARGET = function(msg)
     local key, val = msg:match("^(%S+)%s+(%S+)$")
     val = tonumber(val)
     if key and val and type(defaults[key]) == "number" then
         db[key] = val
         UpdateAll()
-        print("tAggroTarget:", key, "=", val)
+        print("NameplateTarget:", key, "=", val)
     else
-        print("tAggroTarget: /npt offsetX|offsetY|fontSize|hostileOnly|fallbackToTarget <number>")
+        print("NameplateTarget: /npt offsetX|offsetY|fontSize|hostileOnly <number>")
     end
 end
