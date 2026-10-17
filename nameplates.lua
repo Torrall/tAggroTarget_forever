@@ -4,12 +4,32 @@ local defaults = {
     offsetX = 0,
     offsetY = -2,
     fontSize = 12,
-    prefix = "",
-    hostileOnly = 1, -- 1 = only attackable units
-    showThreat = 1, -- 1 = show your threat % on the mob
-    tankMode = 0,   -- 1 = color threat by lead state, 0 = constant color
+    prefix = "→ ",
+    hostileOnly = true,
+    showThreat = true,
+    tankMode = false,
 }
+
 local db = defaults
+
+NameplateTargetAddon = { defaults = defaults }
+local labels, pool = {}, {}
+
+local function ApplyFont(f)
+    f.target:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
+    f.threat:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
+end
+
+local function UpdateAll()
+    for unit in pairs(labels) do
+        UpdateUnit(unit)
+    end
+end
+
+function NameplateTargetAddon.Refresh()
+    for _, f in pairs(labels) do ApplyFont(f) end
+    UpdateAll()
+end
 
 local function isSecret(v)
     return issecretvalue and issecretvalue(v) or false
@@ -25,12 +45,9 @@ end
 ---------------------------------------------------------------------
 -- Label pool: each label has a target line and a threat line
 ---------------------------------------------------------------------
-local labels, pool = {}, {}
 
-local function ApplyFont(f)
-    f.target:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
-    f.threat:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
-end
+
+
 
 local function AcquireLabel()
     local f = table.remove(pool)
@@ -100,7 +117,7 @@ local tankStateColors = {
 local constantThreatColor = { 1, 1, 1 }   -- used when tank mode is off
 
 local function UpdateThreat(f, unit)
-    if db.showThreat ~= 1 then
+    if not db.showThreat then
         f.threat:SetText("")
         return
     end
@@ -113,7 +130,7 @@ local function UpdateThreat(f, unit)
 
     f.threat:SetFormattedText("%d%%", pct)   -- secret number, display only
 
-    if db.tankMode == 1 then
+    if db.tankMode then
         local state = UnitThreatLeadSituation("player", unit)
         if state == nil then
             f.threat:SetTextColor(unpack(constantThreatColor))
@@ -132,7 +149,7 @@ local function UpdateUnit(unit)
         return
     end
 
-    if db.hostileOnly == 1 and SafeBool(UnitCanAttack("player", unit)) == false then
+    if db.hostileOnly and SafeBool(UnitCanAttack("player", unit)) == false then
         ReleaseLabel(unit)
         return
     end
@@ -164,11 +181,7 @@ local function UpdateUnit(unit)
     f:Show()
 end
 
-local function UpdateAll()
-    for unit in pairs(labels) do
-        UpdateUnit(unit)
-    end
-end
+
 
 ---------------------------------------------------------------------
 -- Events
@@ -193,7 +206,13 @@ driver:SetScript("OnEvent", function(_, event, arg1)
                 NameplateTargetDB[k] = v
             end
         end
-        db = NameplateTargetDB
+        -- migrate old 1/0 settings to booleans
+        for _, k in ipairs({ "hostileOnly", "showThreat", "tankMode" }) do
+            if type(db[k]) == "number" then db[k] = db[k] ~= 0 end
+        end
+
+        NameplateTargetAddon.db = db
+        NameplateTargetAddon.InitOptions()
     elseif event == "NAME_PLATE_UNIT_ADDED" then
         UpdateUnit(arg1)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then

@@ -7,3 +7,4 @@
 ## SavedVariables: tAggroTargetDB
 
 nameplates.lua
+options.lua
