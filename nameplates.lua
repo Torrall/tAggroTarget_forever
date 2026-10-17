@@ -62,12 +62,12 @@ end
 -- Colors
 ---------------------------------------------------------------------
 local function GetTargetColor(unit)
-    if UnitIsPlayer(unit) then
-        local _, classToken = UnitClass(unit)
-        if classToken and not isSecret(classToken) then
-            local c = RAID_CLASS_COLORS[classToken]
-            if c then return c.r, c.g, c.b end
-        end
+    -- Only use class color when we can positively tell it's a player
+    local reaction = UnitReaction(unit, "player")
+    if SafeBool(UnitIsPlayer(unit)) == true then
+        local classToken = UnitClassBase(unit)
+        local c = C_ClassColor.GetClassColor(classToken)
+        if c then return c.r, c.g, c.b end
     else
         local reaction = UnitReaction(unit, "player")
         if reaction and not isSecret(reaction) then
