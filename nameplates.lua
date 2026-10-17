@@ -1,7 +1,7 @@
 local ADDON_NAME = ...
 
 local NPT = {}
-NameplateTargetAddon = NPT
+tNameplateTargetAddon = NPT
 
 NPT.defaults = {
     offsetX = 0,
@@ -188,8 +188,8 @@ end
 -- Saved variables
 ---------------------------------------------------------------------
 function NPT.LoadSettings()
-    NameplateTargetDB = NameplateTargetDB or {}
-    db = NameplateTargetDB
+    tAggroTargetDB = tAggroTargetDB or {}
+    db = tAggroTargetDB
 
     for k, v in pairs(NPT.defaults) do
         if db[k] == nil then db[k] = v end

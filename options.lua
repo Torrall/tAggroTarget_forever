@@ -1,5 +1,5 @@
 local ADDON_NAME = ...
-local NPT = NameplateTargetAddon   -- created in the main file (see step 3)
+local NPT = tNameplateTargetAddon   -- created in the main file (see step 3)
 
 function NPT.InitOptions()
     local db = NPT.db
