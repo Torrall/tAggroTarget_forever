@@ -4,9 +4,9 @@ local defaults = {
     offsetX = 0,
     offsetY = -2,
     fontSize = 12,
-    prefix = "→ ",
-    hostileOnly = 1,   -- 1 = only attackable units
-    showThreat = 1,    -- 1 = show your threat % on the mob
+    prefix = "",
+    hostileOnly = 1, -- 1 = only attackable units
+    showThreat = 1, -- 1 = show your threat % on the mob
 }
 local db = defaults
 
@@ -15,7 +15,9 @@ local function isSecret(v)
 end
 
 local function SafeBool(v)
-    if isSecret(v) then return nil end
+    if isSecret(v) then
+        return nil
+    end
     return v and true or false
 end
 
@@ -67,49 +69,49 @@ local function GetTargetColor(unit)
     if SafeBool(UnitIsPlayer(unit)) == true then
         local classToken = UnitClassBase(unit)
         local c = C_ClassColor.GetClassColor(classToken)
-        if c then return c.r, c.g, c.b end
+        if c then
+            return c.r, c.g, c.b
+        end
     else
         local reaction = UnitReaction(unit, "player")
         if reaction and not isSecret(reaction) then
             local c = FACTION_BAR_COLORS[reaction]
-            if c then return c.r, c.g, c.b end
+            if c then
+                return c.r, c.g, c.b
+            end
         end
     end
     return 1, 1, 1
 end
 
-local function GetThreatColor(pct)
-    if isSecret(pct) then return 1, 1, 1 end   -- can't compare, so neutral
-    if pct >= 100 then return 1, 0.2, 0.2 end
-    if pct >= 80 then return 1, 0.8, 0.1 end
-    return 0.3, 1, 0.3
-end
 
 ---------------------------------------------------------------------
 -- Update logic
 ---------------------------------------------------------------------
+-- 0 = none, 1 = yellow, 2 = orange, 3 = red
+local threatStateColors = {
+    [0] = { 0.3, 1.0, 0.3 },   -- green
+    [1] = { 1.0, 0.9, 0.1 },   -- yellow
+    [2] = { 1.0, 0.5, 0.1 },   -- orange
+    [3] = { 1.0, 0.2, 0.2 },   -- red
+}
+
 local function UpdateThreat(f, unit)
     if db.showThreat ~= 1 then
         f.threat:SetText("")
         return
     end
 
-    -- Returns: isTanking, status, scaledPct, rawPct, threatValue
     local _, _, pct = UnitDetailedThreatSituation("player", unit)
+    local state = UnitThreatLeadSituation("player", unit)
 
-    if pct == nil then
-        f.threat:SetText("")   -- no threat on this mob
+    if pct == nil or state == nil then
+        f.threat:SetText("")
         return
     end
 
-    -- Secret numbers can still be handed to SetFormattedText for display.
-    -- pcall guards against the client refusing it.
-    local ok = pcall(f.threat.SetFormattedText, f.threat, "%d%%", pct)
-    if ok then
-        f.threat:SetTextColor(GetThreatColor(pct))
-    else
-        f.threat:SetText("")
-    end
+    f.threat:SetFormattedText("%d%%", pct)   -- secret number, display only
+    f.threat:SetTextColor(unpack(threatStateColors[state]))
 end
 
 local function UpdateUnit(unit)
@@ -152,7 +154,9 @@ local function UpdateUnit(unit)
 end
 
 local function UpdateAll()
-    for unit in pairs(labels) do UpdateUnit(unit) end
+    for unit in pairs(labels) do
+        UpdateUnit(unit)
+    end
 end
 
 ---------------------------------------------------------------------
@@ -169,10 +173,14 @@ driver:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 driver:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
-        if arg1 ~= ADDON_NAME then return end
+        if arg1 ~= ADDON_NAME then
+            return
+        end
         NameplateTargetDB = NameplateTargetDB or {}
         for k, v in pairs(defaults) do
-            if NameplateTargetDB[k] == nil then NameplateTargetDB[k] = v end
+            if NameplateTargetDB[k] == nil then
+                NameplateTargetDB[k] = v
+            end
         end
         db = NameplateTargetDB
     elseif event == "NAME_PLATE_UNIT_ADDED" then
@@ -180,9 +188,13 @@ driver:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         ReleaseLabel(arg1)
     elseif event == "PLAYER_ENTERING_WORLD" then
-        for unit in pairs(labels) do ReleaseLabel(unit) end
+        for unit in pairs(labels) do
+            ReleaseLabel(unit)
+        end
     else
-        if arg1 and arg1:find("^nameplate") then UpdateUnit(arg1) end
+        if arg1 and arg1:find("^nameplate") then
+            UpdateUnit(arg1)
+        end
     end
 end)
 
@@ -195,7 +207,9 @@ SlashCmdList.NAMEPLATETARGET = function(msg)
     val = tonumber(val)
     if key and val and type(defaults[key]) == "number" then
         db[key] = val
-        for _, f in pairs(labels) do ApplyFont(f) end
+        for _, f in pairs(labels) do
+            ApplyFont(f)
+        end
         UpdateAll()
         print("NameplateTarget:", key, "=", val)
     else
