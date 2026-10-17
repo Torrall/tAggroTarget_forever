@@ -11,6 +11,9 @@ NPT.defaults = {
     hostileOnly = true,
     showThreat = true,
     tankMode = false,
+    threatAnchor = "RIGHT", -- point on the name line the threat line attaches to
+    threatOffsetX = 0,
+    threatOffsetY = -1,
 }
 
 local db                -- set to the saved variables on ADDON_LOADED
@@ -25,7 +28,9 @@ end
 
 -- Returns true/false, or nil if the value is secret
 local function SafeBool(v)
-    if isSecret(v) then return nil end
+    if isSecret(v) then
+        return nil
+    end
     return v and true or false
 end
 
@@ -35,6 +40,22 @@ end
 function NPT.ApplyFont(f)
     f.target:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
     f.threat:SetFont(STANDARD_TEXT_FONT, db.fontSize, "OUTLINE")
+end
+
+local oppositePoint = {
+    TOP = "BOTTOM", BOTTOM = "TOP",
+    LEFT = "RIGHT", RIGHT = "LEFT",
+    TOPLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "TOPLEFT",
+    TOPRIGHT = "BOTTOMLEFT", BOTTOMLEFT = "TOPRIGHT",
+    CENTER = "CENTER",
+}
+NPT.oppositePoint = oppositePoint
+
+function NPT.ApplyThreatAnchor(f)
+    local attach = db.threatAnchor
+    f.threat:ClearAllPoints()
+    f.threat:SetPoint(oppositePoint[attach], f.target, attach,
+            db.threatOffsetX, db.threatOffsetY)
 end
 
 function NPT.AcquireLabel()
@@ -49,10 +70,11 @@ function NPT.AcquireLabel()
         f.target:SetJustifyH("CENTER")
 
         f.threat = f:CreateFontString(nil, "OVERLAY")
-        f.threat:SetPoint("TOP", f.target, "BOTTOM", 0, -1)
         f.threat:SetJustifyH("CENTER")
+
     end
     NPT.ApplyFont(f)
+    NPT.ApplyThreatAnchor(f)
     return f
 end
 
@@ -77,10 +99,10 @@ end
 ---------------------------------------------------------------------
 -- Tank palette: 0 = no lead (bad), 3 = securely tanking (good)
 local tankStateColors = {
-    [0] = { 1.0, 0.2, 0.2 },   -- red
-    [1] = { 1.0, 0.5, 0.1 },   -- orange
-    [2] = { 1.0, 0.9, 0.1 },   -- yellow
-    [3] = { 0.3, 1.0, 0.3 },   -- green
+    [0] = { 1.0, 0.2, 0.2 }, -- red
+    [1] = { 1.0, 0.5, 0.1 }, -- orange
+    [2] = { 1.0, 0.9, 0.1 }, -- yellow
+    [3] = { 0.3, 1.0, 0.3 }, -- green
 }
 
 local constantThreatColor = { 1, 1, 1 }   -- used when tank mode is off
@@ -91,12 +113,16 @@ function NPT.GetTargetColor(unit)
     if SafeBool(UnitIsPlayer(unit)) == true then
         local baseClass = UnitClassBase(unit)
         local c = C_ClassColor.GetClassColor(baseClass)
-        if c then return c.r, c.g, c.b end
+        if c then
+            return c.r, c.g, c.b
+        end
     else
         local reaction = UnitReaction(unit, "player")
         if reaction and not isSecret(reaction) then
             local c = FACTION_BAR_COLORS[reaction]
-            if c then return c.r, c.g, c.b end
+            if c then
+                return c.r, c.g, c.b
+            end
         end
     end
     return 1, 1, 1
@@ -130,7 +156,9 @@ function NPT.UpdateThreat(f, unit)
 end
 
 function NPT.UpdateUnit(unit)
-    if not db then return end   -- not loaded yet
+    if not db then
+        return
+    end   -- not loaded yet
 
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if not plate then
@@ -180,6 +208,7 @@ end
 function NPT.Refresh()
     for _, f in pairs(labels) do
         NPT.ApplyFont(f)
+        NPT.ApplyThreatAnchor(f)
     end
     NPT.UpdateAll()
 end
@@ -192,12 +221,16 @@ function NPT.LoadSettings()
     db = tAggroTargetDB
 
     for k, v in pairs(NPT.defaults) do
-        if db[k] == nil then db[k] = v end
+        if db[k] == nil then
+            db[k] = v
+        end
     end
 
     -- migrate old 1/0 settings to booleans
     for _, k in ipairs({ "hostileOnly", "showThreat", "tankMode" }) do
-        if type(db[k]) == "number" then db[k] = db[k] ~= 0 end
+        if type(db[k]) == "number" then
+            db[k] = db[k] ~= 0
+        end
     end
 
     NPT.db = db
@@ -208,7 +241,9 @@ end
 ---------------------------------------------------------------------
 function NPT.OnEvent(_, event, arg1)
     if event == "ADDON_LOADED" then
-        if arg1 ~= ADDON_NAME then return end
+        if arg1 ~= ADDON_NAME then
+            return
+        end
         NPT.LoadSettings()
         NPT.InitOptions()
     elseif event == "NAME_PLATE_UNIT_ADDED" then

@@ -52,6 +52,31 @@ function NPT.InitOptions()
             "Symbol shown before the target's name.")
 
     ---------------------------------------------------------------
+    Header("Threat Line Position")
+
+    local anchorSetting = Bind("threatAnchor", Settings.VarType.String, "Attach to name at")
+    local function AnchorOptions()
+        local container = Settings.CreateControlTextContainer()
+        container:Add("BOTTOM", "Bottom")
+        container:Add("TOP", "Top")
+        container:Add("LEFT", "Left")
+        container:Add("RIGHT", "Right")
+        container:Add("BOTTOMLEFT", "Bottom Left")
+        container:Add("BOTTOMRIGHT", "Bottom Right")
+        container:Add("TOPLEFT", "Top Left")
+        container:Add("TOPRIGHT", "Top Right")
+        container:Add("CENTER", "Center (overlay)")
+        return container:GetData()
+    end
+    Settings.CreateDropdown(category, anchorSetting, AnchorOptions,
+            "Which point of the name line the threat line attaches to.")
+
+    Slider("threatOffsetX", "Threat horizontal offset",
+            "Moves the threat line left or right, relative to its attachment point.", -50, 50, 1)
+    Slider("threatOffsetY", "Threat vertical offset",
+            "Moves the threat line up or down, relative to its attachment point.", -50, 50, 1)
+
+    ---------------------------------------------------------------
     Header("Behavior")
 
     Checkbox("hostileOnly", "Hostile units only",
