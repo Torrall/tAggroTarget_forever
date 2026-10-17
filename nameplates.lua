@@ -7,6 +7,7 @@ local defaults = {
     prefix = "",
     hostileOnly = 1, -- 1 = only attackable units
     showThreat = 1, -- 1 = show your threat % on the mob
+    tankMode = 0,   -- 1 = color threat by lead state, 0 = constant color
 }
 local db = defaults
 
@@ -88,13 +89,15 @@ end
 ---------------------------------------------------------------------
 -- Update logic
 ---------------------------------------------------------------------
--- 0 = none, 1 = yellow, 2 = orange, 3 = red
-local threatStateColors = {
-    [0] = { 0.3, 1.0, 0.3 },   -- green
-    [1] = { 1.0, 0.9, 0.1 },   -- yellow
-    [2] = { 1.0, 0.5, 0.1 },   -- orange
-    [3] = { 1.0, 0.2, 0.2 },   -- red
+-- Tank palette: 0 = no threat (bad), 3 = securely tanking (good)
+local tankStateColors = {
+    [0] = { 1.0, 0.2, 0.2 },   -- red
+    [1] = { 1.0, 0.5, 0.1 },   -- orange
+    [2] = { 1.0, 0.9, 0.1 },   -- yellow
+    [3] = { 0.3, 1.0, 0.3 },   -- green
 }
+
+local constantThreatColor = { 1, 1, 1 }   -- used when tank mode is off
 
 local function UpdateThreat(f, unit)
     if db.showThreat ~= 1 then
@@ -103,15 +106,23 @@ local function UpdateThreat(f, unit)
     end
 
     local _, _, pct = UnitDetailedThreatSituation("player", unit)
-    local state = UnitThreatLeadSituation("player", unit)
-
-    if pct == nil or state == nil then
+    if pct == nil then
         f.threat:SetText("")
         return
     end
 
     f.threat:SetFormattedText("%d%%", pct)   -- secret number, display only
-    f.threat:SetTextColor(unpack(threatStateColors[state]))
+
+    if db.tankMode == 1 then
+        local state = UnitThreatLeadSituation("player", unit)
+        if state == nil then
+            f.threat:SetTextColor(unpack(constantThreatColor))
+        else
+            f.threat:SetTextColor(unpack(tankStateColors[state]))
+        end
+    else
+        f.threat:SetTextColor(unpack(constantThreatColor))
+    end
 end
 
 local function UpdateUnit(unit)
@@ -213,6 +224,6 @@ SlashCmdList.NAMEPLATETARGET = function(msg)
         UpdateAll()
         print("NameplateTarget:", key, "=", val)
     else
-        print("NameplateTarget: /npt offsetX|offsetY|fontSize|hostileOnly|showThreat <number>")
+        print("NameplateTarget: /npt offsetX|offsetY|fontSize|hostileOnly|showThreat|tankMode <number>")
     end
 end
